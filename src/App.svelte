@@ -1,67 +1,67 @@
 <script>
   import { onMount } from "svelte";
-  import { Deck } from "@deck.gl/core";
-  import { MaplibreLayer } from "@deck.gl/maplibre";
-  import Maplibre from "maplibre-gl";
-  import { ScatterplotLayer } from "@deck.gl/layers";
+  import maplibregl from "maplibre-gl";
 
   let map;
-  let deck;
 
-  onMount(async () => {
-    // Sample coordinates
-    const coordinates = [
-      [37.7749, -122.4194], // San Francisco
-      [34.0522, -118.2437], // Los Angeles
-      [40.7128, -74.006], // New York
-    ];
+  // Example data (replace this with your actual DataFrame or data)
+  const points = [
+    { longitude: -0.1278, latitude: 51.5074, name: "London" },
+    { longitude: 2.3522, latitude: 48.8566, name: "Paris" },
+    { longitude: 13.405, latitude: 52.52, name: "Berlin" },
+  ];
 
-    // Prepare the data for the ScatterplotLayer
-    const data = coordinates.map((coord) => ({
-      position: [coord[1], coord[0]], // [longitude, latitude]
-      size: 10, // Marker size
-    }));
-
-    // Initialize Maplibre
-    map = new Maplibre.Map({
-      container: "map",
+  onMount(() => {
+    // Initialize the Maplibre map
+    map = new maplibregl.Map({
+      container: "map", // The ID of the HTML container for the map
       style:
-        "https://api.maptiler.com/maps/basic-v2/style.json?key=dFVEH9IaAa3jwgv9wt5D",
-      center: [-95.7129, 37.0902], // Center of the US
-      zoom: 3,
+        "https://api.maptiler.com/maps/basic-v2/style.json?key=dFVEH9IaAa3jwgv9wt5D", // Maplibre tile URL
+      center: [0, 0], // Map center in [longitude, latitude]
+      zoom: 2, // Initial zoom level
     });
 
-    // Initialize Deck.gl
-    deck = new Deck({
-      initialViewState: {
-        longitude: -95.7129,
-        latitude: 37.0902,
-        zoom: 3,
-        pitch: 0,
-        bearing: 0,
-      },
-      layers: [
-        new MaplibreLayer({
-          id: "maplibre-layer",
-          map: map,
-        }),
-        new ScatterplotLayer({
-          id: "scatterplot-layer",
-          data,
-          getPosition: (d) => d.position,
-          getFillColor: [255, 0, 0],
-          getRadius: 100,
-          radiusMinPixels: 5,
-          radiusMaxPixels: 30,
-        }),
-      ],
-      controller: true,
+    // Add a GeoJSON source for the points
+    const geoJsonData = {
+      type: "FeatureCollection",
+      features: points.map((point) => ({
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates: [point.longitude, point.latitude],
+        },
+        properties: {
+          name: point.name,
+        },
+      })),
+    };
+
+    map.on("load", () => {
+      map.addSource("points", {
+        type: "geojson",
+        data: geoJsonData,
+      });
+
+      // Add a layer to display the points
+      map.addLayer({
+        id: "points-layer",
+        type: "circle",
+        source: "points",
+        paint: {
+          "circle-radius": 6,
+          "circle-color": "#FF5733",
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#ffffff",
+        },
+      });
     });
   });
 </script>
 
+<!-- HTML element where the map will be rendered -->
 <div id="map"></div>
 
+<!-- Styles for the map -->
 <style>
   html,
   body {
@@ -70,6 +70,7 @@
     height: 100%;
     width: 100%;
   }
+
   #map {
     height: 100vh; /* Full height of the viewport */
     width: 100vw; /* Full width of the viewport */
