@@ -8,3 +8,5 @@ AIS Data Plotter is a web application that visualizes AIS (Automatic Identificat
 - **Dynamic File Upload**: Users can upload `.pkl` files containing AIS data for live plotting on the map.
 - **TypeScript Support**: The Svelte frontend is written in TypeScript, providing type safety and better code maintainability.
 - **CORS Configuration**: Supports communication between frontend (Svelte + TypeScript) and backend (FastAPI) servers.
+
+![AIS Data Plotter Screenshot](src/assets/screenshot1.png)
