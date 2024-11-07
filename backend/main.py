@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
@@ -6,7 +6,7 @@ import pandas as pd
 import logging
 from fastapi.responses import JSONResponse
 
-# Set up logging configuration to show debug messages
+# Set up logging configuration
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,6 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
 )
 
-
 class Point(BaseModel):
     lon: float
     lat: float
@@ -30,7 +29,7 @@ class Point(BaseModel):
 class PointsResponse(BaseModel):
     points: List[Point]
 
-# Function to load points from pickle
+# Function to load points from a static pickle file
 def load_points_from_pickle(filepath: str) -> pd.DataFrame:
     try:
         df = pd.read_pickle(filepath)
@@ -40,17 +39,18 @@ def load_points_from_pickle(filepath: str) -> pd.DataFrame:
         logger.error(f"Error loading DataFrame from pickle: {e}")
         return pd.DataFrame()
 
+# GET endpoint to retrieve points from a static file
 @app.get("/api/points", response_model=PointsResponse)
 async def get_points():
     logger.debug("GET /api/points endpoint hit")
-    filepath = "../AIS/maritime_graph/data/ships.pkl"  # Ensure the path is correct
+    filepath = "../AIS/maritime_graph/data/ships.pkl"  # Ensure this path is correct
     df = load_points_from_pickle(filepath)
     
     if not df.empty:
         try:
             if 'lat' not in df.columns or 'lon' not in df.columns or 'MMSI' not in df.columns:
                 raise ValueError("Required columns ('lat', 'lon', 'MMSI') not found in the DataFrame.")
-            df_transformed = df[['lat', 'lon', 'MMSI']].head(500000).copy()
+            df_transformed = df[['lat', 'lon', 'MMSI']].head(200000).copy()
             points_data = df_transformed.to_dict(orient="records")
             return PointsResponse(points=points_data)
         except Exception as e:
@@ -59,3 +59,26 @@ async def get_points():
     else:
         return PointsResponse(points=[])
 
+# POST endpoint to upload and process a .pickle file
+@app.post("/api/upload-pickle", response_model=PointsResponse)
+async def upload_pickle(file: UploadFile = File(...)):
+    try:
+        # Read the uploaded file
+        contents = await file.read()
+
+        # Load the contents as a DataFrame
+        df = pd.read_pickle(pd.io.common.BytesIO(contents))
+
+        # Verify required columns
+        if 'lat' not in df.columns or 'lon' not in df.columns or 'MMSI' not in df.columns:
+            raise ValueError("Uploaded file must contain 'lat', 'lon', and 'MMSI' columns.")
+        
+        # Process the DataFrame
+        df_transformed = df[['lat', 'lon', 'MMSI']].head(200000).copy()
+        points_data = df_transformed.to_dict(orient="records")
+
+        return PointsResponse(points=points_data)
+
+    except Exception as e:
+        logger.error(f"Error processing uploaded pickle file: {e}")
+        raise HTTPException(status_code=400, detail="Failed to process the uploaded pickle file.")
