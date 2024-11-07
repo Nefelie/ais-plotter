@@ -3,24 +3,35 @@
   import maplibregl from "maplibre-gl"; // Import maplibregl for both types and runtime
 
   let map: maplibregl.Map; // Explicitly type the map as maplibregl.Map
-  let points: { longitude: number; latitude: number; name: string }[] = []; // Declare points array
+  let points: { lat: number; lon: number; MMSI: number }[] = [];
 
   // Function to fetch points data from the FastAPI backend
   async function fetchPoints() {
-    const response = await fetch("http://127.0.0.1:8000/api/points"); // Fetch from backend
-    if (response.ok) {
-      const data = await response.json();
-      console.log(data); // Add this line to debug
-      points = data.points; // Store points data
-      console.log("POINTS", points);
-      updateMap(); // Update the map with the fetched points data
-    } else {
-      console.error("Failed to fetch points data");
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/points"); // Fetch from backend
+      if (response.ok) {
+        const data = await response.json();
+        console.log(data); // Log the entire response to verify
+
+        // Check if 'data' contains 'points' and it's an array
+        if (data && Array.isArray(data.points)) {
+          points = data.points; // Correctly assign the points array from the response
+          updateMap(); // Update the map with the fetched points data
+        } else {
+          console.error("The 'points' field is missing or not an array.");
+        }
+      } else {
+        console.error("Failed to fetch points data");
+      }
+    } catch (error) {
+      console.error("Error fetching points:", error);
     }
   }
 
   // Function to update the map with the fetched points
   function updateMap() {
+    console.log("Points array:", points); // Debug the points array
+
     // Convert the points into GeoJSON format
     const geoJsonData: GeoJSON.FeatureCollection = {
       type: "FeatureCollection",
@@ -28,10 +39,10 @@
         type: "Feature",
         geometry: {
           type: "Point",
-          coordinates: [point.longitude, point.latitude],
+          coordinates: [point.lon, point.lat], // Adjusted to match the incoming data
         },
         properties: {
-          name: point.name,
+          MMSI: point.MMSI, // You can display MMSI or any other relevant property
         },
       })),
     };
@@ -54,10 +65,8 @@
         type: "circle",
         source: "points",
         paint: {
-          "circle-radius": 6,
-          "circle-color": "#FF5733",
-          "circle-stroke-width": 2,
-          "circle-stroke-color": "#ffffff",
+          "circle-radius": 2,
+          "circle-color": "#000000",
         },
       });
     }
@@ -68,8 +77,8 @@
       map = new maplibregl.Map({
         container: "map",
         style:
-          "https://api.maptiler.com/maps/basic-v2/style.json?key=dFVEH9IaAa3jwgv9wt5D",
-        center: [2.3522, 48.8566], // Paris coordinates
+          "https://api.maptiler.com/maps/basic-v2/style.json?key=dFVEH9IaAa3jwgv9wt5D", // Map style URL
+        center: [2.3522, 48.8566], // Default center (Paris coordinates)
         zoom: 5, // Set zoom level
       });
 
