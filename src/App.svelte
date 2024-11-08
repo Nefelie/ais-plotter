@@ -69,7 +69,8 @@
   onMount(() => {
     map = new Map({
       container: "map",
-      style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+      style:
+        "https://api.maptiler.com/maps/basic-v2/style.json?key=dFVEH9IaAa3jwgv9wt5D", // MapTiler style URL
       center: [10.522, 55.8566],
       zoom: 5,
     });
@@ -84,10 +85,10 @@
       });
 
       // Add DeckGL overlay to the map
-      map.addControl(deckOverlay);
+      map.addControl(deckOverlay as unknown as maplibregl.IControl);
 
       // Optionally, fetch points data from your API
-      fetchPoints();
+      // fetchPoints();
     });
   });
 </script>
