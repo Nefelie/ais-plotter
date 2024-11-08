@@ -8,9 +8,14 @@
   let map: Map;
   let deckOverlay: MapboxOverlay;
   let points: { lat: number; lon: number; MMSI: number }[] = [];
+  let fileName: string | null = null; // Store the filename of the uploaded file
+  let isFileSelected: boolean = false; // Store if a file is selected
+  let isMapReady: boolean = false; // Track when the map is fully loaded and ready
 
   // Function to update the map with points data
   function updateMap() {
+    if (!isMapReady || !deckOverlay) return; // Guard clause to ensure map is ready
+
     console.log("Points array:", points);
 
     const pointData = points.map((point) => ({
@@ -27,10 +32,17 @@
       radiusMinPixels: 0.5,
     });
 
-    // Update DeckGL overlay layers
-    deckOverlay.setProps({
-      layers: [scatterplotLayer],
-    });
+    // Add the scatterplot layer to the overlay if isFileSelected is true
+    if (isFileSelected) {
+      deckOverlay.setProps({
+        layers: [scatterplotLayer],
+      });
+    } else {
+      // Remove the scatterplot layer if the checkbox is unchecked
+      deckOverlay.setProps({
+        layers: [],
+      });
+    }
   }
 
   // Function to handle file upload and update map
@@ -63,7 +75,16 @@
       } catch (error) {
         console.error("Error uploading file:", error);
       }
+
+      // Set the filename and indicate that a file was selected
+      fileName = file.name;
+      isFileSelected = true; // Set the checkbox to be checked by default
     }
+  }
+
+  // Reactively update the map when the checkbox is checked/unchecked
+  $: if (isFileSelected !== undefined && isMapReady) {
+    updateMap();
   }
 
   onMount(() => {
@@ -87,8 +108,8 @@
       // Add DeckGL overlay to the map
       map.addControl(deckOverlay as unknown as maplibregl.IControl);
 
-      // Optionally, fetch points data from your API
-      // fetchPoints();
+      // Now that the map is ready, we can update the map
+      isMapReady = true; // Set the flag to true indicating map is ready
     });
   });
 </script>
@@ -103,6 +124,18 @@
       accept=".pkl"
       on:change={handleFileUpload}
     />
+    <!-- Always display the checkbox and filename once a file is uploaded -->
+    {#if fileName}
+      <div class="file-info">
+        <!-- Bind the checkbox's 'checked' attribute to isFileSelected -->
+        <input
+          type="checkbox"
+          id="file-checkbox"
+          bind:checked={isFileSelected}
+        />
+        <label for="file-checkbox">{fileName}</label>
+      </div>
+    {/if}
   </div>
   <div id="map"></div>
 </div>
@@ -156,5 +189,17 @@
   }
   input[type="file"] {
     display: none;
+  }
+  .file-info {
+    margin-top: 15px;
+    display: flex;
+    align-items: center;
+  }
+  .file-info input[type="checkbox"] {
+    margin-right: 10px;
+  }
+  .file-info label {
+    font-size: 1em;
+    color: #333;
   }
 </style>
