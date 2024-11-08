@@ -74,7 +74,7 @@ async def upload_pickle(file: UploadFile = File(...)):
             raise ValueError("Uploaded file must contain 'lat', 'lon', and 'MMSI' columns.")
         
         # Process the DataFrame
-        df_transformed = df[['lat', 'lon', 'MMSI']].head(200000).copy()
+        df_transformed = df[['lat', 'lon', 'MMSI']].head(500000).copy()
         points_data = df_transformed.to_dict(orient="records")
 
         return PointsResponse(points=points_data)

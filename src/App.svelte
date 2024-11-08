@@ -1,48 +1,36 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import maplibregl from "maplibre-gl";
+  import { Map } from "maplibre-gl";
+  import { MapboxOverlay } from "@deck.gl/mapbox";
+  import { ScatterplotLayer } from "@deck.gl/layers";
+  import "maplibre-gl/dist/maplibre-gl.css";
 
-  let map: maplibregl.Map;
+  let map: Map;
+  let deckOverlay: MapboxOverlay;
   let points: { lat: number; lon: number; MMSI: number }[] = [];
 
   // Function to update the map with points data
   function updateMap() {
     console.log("Points array:", points);
 
-    const geoJsonData: GeoJSON.FeatureCollection = {
-      type: "FeatureCollection",
-      features: points.map((point) => ({
-        type: "Feature",
-        geometry: {
-          type: "Point",
-          coordinates: [point.lon, point.lat],
-        },
-        properties: {
-          MMSI: point.MMSI,
-        },
-      })),
-    };
+    const pointData = points.map((point) => ({
+      position: [point.lon, point.lat],
+      MMSI: point.MMSI,
+    }));
 
-    if (map.getSource("points")) {
-      (map.getSource("points") as maplibregl.GeoJSONSource).setData(
-        geoJsonData
-      );
-    } else {
-      map.addSource("points", {
-        type: "geojson",
-        data: geoJsonData,
-      });
+    const scatterplotLayer = new ScatterplotLayer({
+      id: "scatterplot-layer",
+      data: pointData,
+      getPosition: (d: any) => d.position,
+      getRadius: 1,
+      getFillColor: [0, 0, 0], // Black color for the points
+      radiusMinPixels: 0.5,
+    });
 
-      map.addLayer({
-        id: "points-layer",
-        type: "circle",
-        source: "points",
-        paint: {
-          "circle-radius": 1,
-          "circle-color": "#000000",
-        },
-      });
-    }
+    // Update DeckGL overlay layers
+    deckOverlay.setProps({
+      layers: [scatterplotLayer],
+    });
   }
 
   // Function to handle file upload and update map
@@ -50,8 +38,6 @@
     const input = event.target as HTMLInputElement;
     if (input && input.files && input.files[0]) {
       const file = input.files[0];
-
-      // Create a form data object to send the file to the server
       const formData = new FormData();
       formData.append("file", file);
 
@@ -63,7 +49,6 @@
             body: formData,
           }
         );
-
         if (response.ok) {
           const data = await response.json();
           if (data && Array.isArray(data.points)) {
@@ -82,20 +67,28 @@
   }
 
   onMount(() => {
-    if (maplibregl) {
-      map = new maplibregl.Map({
-        container: "map",
-        style:
-          "https://api.maptiler.com/maps/basic-v2/style.json?key=dFVEH9IaAa3jwgv9wt5D",
-        center: [2.3522, 48.8566],
-        zoom: 5,
+    map = new Map({
+      container: "map",
+      style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+      center: [10.522, 55.8566],
+      zoom: 5,
+    });
+
+    map.once("load", () => {
+      console.log("Map loaded successfully!");
+
+      // Create DeckGL overlay with MapLibre map
+      deckOverlay = new MapboxOverlay({
+        interleaved: true, // Ensures Deck.gl layers appear under MapLibre labels
+        layers: [],
       });
 
-      map.on("load", () => {
-        console.log("Map loaded successfully!");
-        fetchPoints();
-      });
-    }
+      // Add DeckGL overlay to the map
+      map.addControl(deckOverlay);
+
+      // Optionally, fetch points data from your API
+      fetchPoints();
+    });
   });
 </script>
 
