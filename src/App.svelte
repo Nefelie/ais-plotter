@@ -7,42 +7,46 @@
 
   let map: Map;
   let deckOverlay: MapboxOverlay;
-  let points: { lat: number; lon: number; MMSI: number }[] = [];
-  let fileName: string | null = null; // Store the filename of the uploaded file
-  let isFileSelected: boolean = false; // Store if a file is selected
-  let isMapReady: boolean = false; // Track when the map is fully loaded and ready
+  let allPoints: { lat: number; lon: number; MMSI: number }[][] = []; // Array of points arrays for each file
+  let fileNames: string[] = []; // Store filenames of uploaded files
+  let fileSelections: boolean[] = []; // Store checkbox states for each file
+  let fileColors: string[] = []; // Store color for each file's points
+  let isMapReady: boolean = false; // Track when the map is fully loaded
 
-  // Function to update the map with points data
+  // Function to update the map with selected points data
   function updateMap() {
-    if (!isMapReady || !deckOverlay) return; // Guard clause to ensure map is ready
+    if (!isMapReady || !deckOverlay) return;
 
-    console.log("Points array:", points);
+    // Create layers for each selected file with its respective color
+    const layers = allPoints
+      .map((points, index) => {
+        if (!fileSelections[index]) return null; // Skip if file is not selected
 
-    const pointData = points.map((point) => ({
-      position: [point.lon, point.lat],
-      MMSI: point.MMSI,
-    }));
+        const pointData = points.map((point) => ({
+          position: [point.lon, point.lat],
+          MMSI: point.MMSI,
+        }));
 
-    const scatterplotLayer = new ScatterplotLayer({
-      id: "scatterplot-layer",
-      data: pointData,
-      getPosition: (d: any) => d.position,
-      getRadius: 1,
-      getFillColor: [0, 0, 0], // Black color for the points
-      radiusMinPixels: 0.5,
-    });
+        const [r, g, b] = hexToRgb(fileColors[index]); // Convert hex color to RGB array
 
-    // Add the scatterplot layer to the overlay if isFileSelected is true
-    if (isFileSelected) {
-      deckOverlay.setProps({
-        layers: [scatterplotLayer],
-      });
-    } else {
-      // Remove the scatterplot layer if the checkbox is unchecked
-      deckOverlay.setProps({
-        layers: [],
-      });
-    }
+        return new ScatterplotLayer({
+          id: `scatterplot-layer-${index}`,
+          data: pointData,
+          getPosition: (d: any) => d.position,
+          getRadius: 1,
+          getFillColor: [r, g, b], // Use the selected color
+          radiusMinPixels: 0.5,
+        });
+      })
+      .filter((layer) => layer !== null); // Filter out any null layers
+
+    deckOverlay.setProps({ layers });
+  }
+
+  // Function to convert hex color to RGB array
+  function hexToRgb(hex: string): [number, number, number] {
+    const bigint = parseInt(hex.slice(1), 16);
+    return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
   }
 
   // Function to handle file upload and update map
@@ -64,7 +68,7 @@
         if (response.ok) {
           const data = await response.json();
           if (data && Array.isArray(data.points)) {
-            points = data.points;
+            allPoints = [...allPoints, data.points]; // Add new points array for this file
             updateMap();
           } else {
             console.error("The 'points' field is missing or not an array.");
@@ -76,14 +80,15 @@
         console.error("Error uploading file:", error);
       }
 
-      // Set the filename and indicate that a file was selected
-      fileName = file.name;
-      isFileSelected = true; // Set the checkbox to be checked by default
+      // Append the new file information to the lists
+      fileNames = [...fileNames, file.name];
+      fileSelections = [...fileSelections, true];
+      fileColors = [...fileColors, "#000000"]; // Default color is black
     }
   }
 
-  // Reactively update the map when the checkbox is checked/unchecked
-  $: if (isFileSelected !== undefined && isMapReady) {
+  // Reactively update the map when file selections or colors change
+  $: if ((fileSelections || fileColors) && isMapReady) {
     updateMap();
   }
 
@@ -101,15 +106,14 @@
 
       // Create DeckGL overlay with MapLibre map
       deckOverlay = new MapboxOverlay({
-        interleaved: true, // Ensures Deck.gl layers appear under MapLibre labels
+        interleaved: true,
         layers: [],
       });
 
       // Add DeckGL overlay to the map
       map.addControl(deckOverlay as unknown as maplibregl.IControl);
 
-      // Now that the map is ready, we can update the map
-      isMapReady = true; // Set the flag to true indicating map is ready
+      isMapReady = true;
     });
   });
 </script>
@@ -124,18 +128,19 @@
       accept=".pkl"
       on:change={handleFileUpload}
     />
-    <!-- Always display the checkbox and filename once a file is uploaded -->
-    {#if fileName}
+
+    <!-- Display the list of files with their respective checkboxes and color pickers -->
+    {#each fileNames as fileName, index}
       <div class="file-info">
-        <!-- Bind the checkbox's 'checked' attribute to isFileSelected -->
-        <input
-          type="checkbox"
-          id="file-checkbox"
-          bind:checked={isFileSelected}
-        />
+        <input type="checkbox" bind:checked={fileSelections[index]} />
         <label for="file-checkbox">{fileName}</label>
+        <input
+          type="color"
+          bind:value={fileColors[index]}
+          on:input={updateMap}
+        />
       </div>
-    {/if}
+    {/each}
   </div>
   <div id="map"></div>
 </div>
@@ -201,5 +206,12 @@
   .file-info label {
     font-size: 1em;
     color: #333;
+    margin-right: 10px;
+  }
+  .file-info input[type="color"] {
+    width: 30px;
+    height: 30px;
+    border: none;
+    cursor: pointer;
   }
 </style>
