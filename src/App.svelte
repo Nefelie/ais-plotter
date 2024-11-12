@@ -5,12 +5,16 @@
   import { ScatterplotLayer } from "@deck.gl/layers";
   import "maplibre-gl/dist/maplibre-gl.css";
 
+  // Import the color picker components
+  import ColorPicker from "svelte-awesome-color-picker";
+  import Wrapper from "./Wrapper.svelte";
+
   let map: Map;
   let deckOverlay: MapboxOverlay;
   let allPoints: { lat: number; lon: number; MMSI: number }[][] = []; // Array of points arrays for each file
   let fileNames: string[] = []; // Store filenames of uploaded files
   let fileSelections: boolean[] = []; // Store checkbox states for each file
-  let fileColors: string[] = []; // Store color for each file's points
+  let fileColors: string[] = []; // Store hex color for each file's points
   let isMapReady: boolean = false; // Track when the map is fully loaded
 
   // Function to update the map with selected points data
@@ -27,14 +31,15 @@
           MMSI: point.MMSI,
         }));
 
-        const [r, g, b] = hexToRgb(fileColors[index]); // Convert hex color to RGB array
+        // Convert hex color to RGB array for ScatterplotLayer
+        const [r, g, b] = hexToRgb(fileColors[index]);
 
         return new ScatterplotLayer({
           id: `scatterplot-layer-${index}`,
           data: pointData,
           getPosition: (d: any) => d.position,
           getRadius: 1,
-          getFillColor: [r, g, b], // Use the selected color
+          getFillColor: [r, g, b, 255], // Use the selected RGB color with full opacity
           radiusMinPixels: 0.5,
         });
       })
@@ -118,6 +123,7 @@
   });
 </script>
 
+<div id="portal"></div>
 <div id="container">
   <div id="sidebar">
     <h1>AIS Data Plotter</h1>
@@ -134,10 +140,16 @@
       <div class="file-info">
         <input type="checkbox" bind:checked={fileSelections[index]} />
         <label for="file-checkbox">{fileName}</label>
-        <input
-          type="color"
-          bind:value={fileColors[index]}
-          on:input={updateMap}
+
+        <!-- Color Picker for each file -->
+        <ColorPicker
+          components={{ wrapper: Wrapper }}
+          label=""
+          hex={fileColors[index]}
+          on:input={(event) => {
+            fileColors[index] = event.detail.hex; // Update color in HEX format
+            updateMap(); // Call updateMap to reapply colors on the map
+          }}
         />
       </div>
     {/each}
@@ -208,10 +220,8 @@
     color: #333;
     margin-right: 10px;
   }
-  .file-info input[type="color"] {
-    width: 30px;
-    height: 30px;
-    border: none;
-    cursor: pointer;
+  .no-overflow {
+    border: 3px solid black;
+    overflow: hidden;
   }
 </style>
